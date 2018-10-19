@@ -175,28 +175,70 @@ class WebPage implements Page
 	}
 
 	/**
-     * @author Samuel ("Dartz") - Código do MPETO
-     * @param string $str String que é fonte da busca.
-     * @param string $substr Sub-string a ser encontrada.
-     * @param int $extract_size Total de caracteres a ser adquirido se 
-     * a sub-string for encontrada.
-     * @return string/boolean Busca dentro de uma string uma 
-     * sub-string. Retorna false se não encontrou a 
-     * sub-string ou se ela estiver vazia. Caso contrário, retorna a 
-     * sub-string.
-     */
-    private function find_substr($str, $substr, $extract_size)
-    {
-        if ( ($pos = strpos($str, $substr)) != false && 
-             ($sub = substr($str, $pos, $extract_size)) != false )
-        {
-            return $sub;
-        }
-        else
-        {
-            return false;
-        }
-    }
+	 * Dada uma string, retorna uma sub-string.
+	 * 
+	 * @author Samuel Viveiros Gomes <samuel.viveiros@gmail.com.br>
+	 * 
+	 * @param string $str           String alvo.
+	 * @param string $substr        Sub-string a ser adquirida.
+	 * @param int    $extract_size  Total de caracteres a ser adquirido 
+	 *                              se a sub-string for encontrada.
+	 * 
+	 * @return string/boolean Retorna false se não encontrou a 
+	 * sub-string ou se ela estiver vazia. Caso contrário, retorna a 
+	 * sub-string.
+	 */
+	private function GetSubstr($str, $substr, $extract_size)
+	{
+		if ( ($pos = strpos($str, $substr)) != false && 
+			 ($sub = substr($str, $pos, $extract_size)) != false )
+		{
+			return $sub;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	/**
+	 * Verifica se todas as tarefas de uma solicitação foram resolvidas.
+	 * 
+	 * @author Samuel Viveiros Gomes <samuel.viveiros@gmail.com.br>
+	 * 
+	 * @param string $sTicketRef Código da Solicitação (Ex.: R-000123).
+	 * 
+	 * @return boolean Retorna true se todas as Tarefas da Solicitação
+	 * foram resolvidas. Caso contrário, retorna false se há pelo menos 
+	 * uma Tarefa não resolvida, ou se a Solicitação não tem Tarefa 
+	 * alguma associada a ela.
+	 */
+	private function IsAllWorkOrdersResolved($sTicketRef)
+	{
+		// Traz todas as Tarefas associadas com a solicitação, independentemente do 
+		// status das Tarefas.
+		$sOQLWorkOrder = "SELECT WorkOrder AS w WHERE w.ticket_ref = '".$sTicketRef."'";
+		$oSetWorkOrder = new DBObjectSet(DBObjectSearch::FromOQL($sOQLWorkOrder));
+
+		// Se a Solicitação (UserRequest) não tem Tarefas (WorkOrders), retorna false.
+		if ( $oSetWorkOrder->Count() <= 0 )
+		{
+			return false;
+		}
+
+		// Se houver alguma Tarefa NÃO resolvida, retorna false.
+		// Caso contrário -- se todas foram resolvidas -- retorna true.
+		$oSetWorkOrder->Rewind();
+		while ( $oWorkOrder = $oSetWorkOrder->Fetch() )
+		{
+			if ( $oWorkOrder->Get("status") !== "resolved" )
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
 
 	public function GetTable($aConfig, $aData, $aParams = array())
 	{
@@ -220,25 +262,19 @@ class WebPage implements Page
 		{
 			$sRow = $this->GetTableRow($aRow, $aConfig);
 
-            // --------- INICIO CODIGO MPETO ---------\\
-            // Tenta extrair de $aRow o código da solicitação, o qual começa com R-
-            $sKey = $this->find_substr($aRow['key_UserRequest'], 'R-', 8);
-            if ( $sKey != false )
-            {
-                // Traz todas as Tarefas associadas com a solicitação, mas somente as resolvidas
-                $qWorkOrder = "SELECT WorkOrder AS w WHERE w.status = 'resolved' AND w.ticket_ref = '".$sKey."'"; 
-                $oWorkOrders = new DBObjectSet(DBObjectSearch::FromOQL($qWorkOrder));
-                $oWorkOrders->Rewind();
+			// --------- INICIO CODIGO MPETO ---------\\
+			// Tenta extrair de $aRow o código da solicitação (ticket_ref), o qual começa com R-
+			$sTicketRef = $this->GetSubstr($aRow['key_UserRequest'], 'R-', 8);
 
-                // Se houver alguma Tarefa resolvida, muda a cor de fundo da tag <tr>
-                if ( $oWorkOrder = $oWorkOrders->Fetch() )
-                {
-                    $sRow = substr_replace($sRow, "<tr style='background-color: #00FF00'>", 0, 4);
-                }
-            }
-            // ---------- FIM CODIGO MPETO -----------\\
+			// Se encontrou algum ticket_ref, e todas as tarefas dele foram resolvidas, modifica 
+			// o background-color da tag <tr> a fim de notificar os operadores do sistema.
+			if ( $sTicketRef != false && $this->IsAllWorkOrdersResolved($sTicketRef) )
+			{
+				$sRow = substr_replace($sRow, "<tr style='background-color: #8cb0d8'>", 0, 4); // cor de fundo
+			}
+			// ---------- FIM CODIGO MPETO -----------\\
 
-            $sHtml .= $sRow;	
+			$sHtml .= $sRow;
 		}
 
 		$sHtml .= "</tbody>\n";
