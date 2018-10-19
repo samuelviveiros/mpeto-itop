@@ -173,6 +173,56 @@ class WebPage implements Page
 	{
 		$this->add($this->GetTable($aConfig, $aData, $aParams));
 	}
+	
+	/**
+     * @author Dartz
+     * @param string $path Caminho para gravar o arquivo texto.
+     * @param string $fileName Nome do arquivo texto.
+     * @param string $someContent Texto a ser gravado no arquivo.
+     * @return É uma procedure e, portanto, não há retorno.
+     */
+	/*
+	private function fazLog($path, $fileName, $someContent)
+	{
+		static $contador;
+		if ( isset($contador) )
+			$contador += 1;
+		else
+			$contador = 1;
+		//var_export($contador);
+
+
+		$arquivoTexto = fopen("$path$fileName$contador", "w");
+		fwrite($arquivoTexto, "\n-------------------------------------\n");
+		fwrite($arquivoTexto, var_export($someContent, true));
+		fwrite($arquivoTexto, "\n-------------------------------------\n");
+		fclose($arquivoTexto);
+	}
+	*/
+
+	/**
+     * @author Samuel ("Dartz") - Código do MPETO
+     * @param string $str String que é fonte da busca.
+     * @param string $substr Sub-string a ser encontrada.
+     * @param int $extract_size Total de caracteres a ser adquirido se 
+     * a sub-string for encontrada.
+     * @return string/boolean Busca dentro de uma string uma 
+     * sub-string. Retorna false se não encontrou a 
+     * sub-string ou se ela estiver vazia. Caso contrário, retorna a 
+     * sub-string.
+     */
+    private function find_substr($str, $substr, $extract_size)
+    {
+        if ( ($pos = strpos($str, $substr)) != false && 
+             ($sub = substr($str, $pos, $extract_size)) != false )
+        {
+            return $sub;
+        }
+        else
+        {
+            return false;
+        }
+    }
 
 	public function GetTable($aConfig, $aData, $aParams = array())
 	{
@@ -194,22 +244,63 @@ class WebPage implements Page
 
 		foreach($aData as $aRow)
 		{
-			$sHtml .= $this->GetTableRow($aRow, $aConfig);
+			$sRow = $this->GetTableRow($aRow, $aConfig);
+
+			// --------- INICIO CODIGO MPETO ---------\\
+			// Tenta extrair de $aRow o código da solicitação, o qual começa com R-
+			$sKey = $this->find_substr($aRow['key_UserRequest'], 'R-', 8);
+			if ( $sKey != false )
+			{
+				// Traz todas as Tarefas associadas com a solicitação, mas somente as resolvidas
+				$qWorkOrder = "SELECT WorkOrder AS w WHERE w.status = 'resolved' AND w.ticket_ref = '".$sKey."'"; 
+				$oWorkOrders = new DBObjectSet(DBObjectSearch::FromOQL($qWorkOrder));
+				$oWorkOrders->Rewind();
+
+				// Se houver alguma Tarefa resolvida, muda a cor de fundo da tag <tr>
+				if ( $oWorkOrder = $oWorkOrders->Fetch() )
+				{
+					$sRow = substr_replace($sRow, "<tr style='background-color: #00FF00'>", 0, 4);
+				}
+			}
+			// ---------- FIM CODIGO MPETO -----------\\
+
+			$sHtml .= $sRow;
+			
 		}
 
 		$sHtml .= "</tbody>\n";
 		$sHtml .= "</table>\n";
 		return $sHtml;
 	}
+	
+/*	public function GetTableRow($aRow, $aConfig)
+	{
+		$sHtml = '';
+		if (isset($aRow['@class'])) // Row specific class, for hilighting certain rows
+		{
+			$sHtml .= "<tr class=\"{$aRow['@class']}\">";				
+		}
+		else
+		{
+			$sHtml .= "<tr>";
+		}
+		foreach($aConfig as $sName=>$aAttribs)
+		{
+			$sClass = isset($aAttribs['class']) ? 'class="'.$aAttribs['class'].'"' : '';
+			$sValue = ($aRow[$sName] === '') ? '&nbsp;' : $aRow[$sName];
+			$sHtml .= "<td $sClass>$sValue</td>";
+		}
+		$sHtml .= "</tr>";
+		return $sHtml;	
+	}
+    */
 
 	public function GetTableRow($aRow, $aConfig)
     {
         $sHtml = '';
         if (isset($aRow['@class'])) // Row specific class, for hilighting certain rows
         {
-            $sHtml .= "<tr class=\"{$aRow['@class']}\">";
-            //var_dump("<tr class=\"{$aRow['@class']}\">");
-            file_put_contents('/home/labnet/dartz/getTableRow.txt', var_export($aRow,true).PHP_EOL , FILE_APPEND | LOCK_EX);
+            $sHtml .= "<tr class=\"{$aRow['@class']}\">";                           
         }
         else
         {
@@ -250,6 +341,7 @@ class WebPage implements Page
         $this->a_dict_entries[$s_entryId] = Dict::S($s_entryId);
     }
     
+
 	/**
 	 * Add some CSS definitions to the header of the page
 	 */
