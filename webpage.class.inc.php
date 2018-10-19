@@ -174,6 +174,30 @@ class WebPage implements Page
 		$this->add($this->GetTable($aConfig, $aData, $aParams));
 	}
 
+	/**
+     * @author Samuel ("Dartz") - Código do MPETO
+     * @param string $str String que é fonte da busca.
+     * @param string $substr Sub-string a ser encontrada.
+     * @param int $extract_size Total de caracteres a ser adquirido se 
+     * a sub-string for encontrada.
+     * @return string/boolean Busca dentro de uma string uma 
+     * sub-string. Retorna false se não encontrou a 
+     * sub-string ou se ela estiver vazia. Caso contrário, retorna a 
+     * sub-string.
+     */
+    private function find_substr($str, $substr, $extract_size)
+    {
+        if ( ($pos = strpos($str, $substr)) != false && 
+             ($sub = substr($str, $pos, $extract_size)) != false )
+        {
+            return $sub;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
 	public function GetTable($aConfig, $aData, $aParams = array())
 	{
 		$oAppContext = new ApplicationContext();
@@ -194,7 +218,27 @@ class WebPage implements Page
 
 		foreach($aData as $aRow)
 		{
-			$sHtml .= $this->GetTableRow($aRow, $aConfig);	
+			$sRow = $this->GetTableRow($aRow, $aConfig);
+
+            // --------- INICIO CODIGO MPETO ---------\\
+            // Tenta extrair de $aRow o código da solicitação, o qual começa com R-
+            $sKey = $this->find_substr($aRow['key_UserRequest'], 'R-', 8);
+            if ( $sKey != false )
+            {
+                // Traz todas as Tarefas associadas com a solicitação, mas somente as resolvidas
+                $qWorkOrder = "SELECT WorkOrder AS w WHERE w.status = 'resolved' AND w.ticket_ref = '".$sKey."'"; 
+                $oWorkOrders = new DBObjectSet(DBObjectSearch::FromOQL($qWorkOrder));
+                $oWorkOrders->Rewind();
+
+                // Se houver alguma Tarefa resolvida, muda a cor de fundo da tag <tr>
+                if ( $oWorkOrder = $oWorkOrders->Fetch() )
+                {
+                    $sRow = substr_replace($sRow, "<tr style='background-color: #00FF00'>", 0, 4);
+                }
+            }
+            // ---------- FIM CODIGO MPETO -----------\\
+
+            $sHtml .= $sRow;	
 		}
 
 		$sHtml .= "</tbody>\n";
